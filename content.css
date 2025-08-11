@@ -1,0 +1,63 @@
+img,
+picture,
+video,
+canvas,
+svg,
+[style*="background-image"],
+.bg-image,
+[class*="image"],
+[class*="photo"],
+[class*="picture"] {
+  filter: blur(10px) !important;
+  transition: filter 0.2s ease !important;
+}
+
+/* Whitelist override class */
+.blur-shield-whitelist * {
+  filter: none !important;
+}
+
+/* Unblur override class */
+.blur-shield-unblurred {
+  filter: none !important;
+}
+
+/* Hover button optimized for performance */
+.blur-shield-hover-btn {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font: 12px/1.2 system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  z-index: 999999;
+  pointer-events: auto;
+  user-select: none;
+  transform: translateZ(0) translate(-50%, -50%); /* Center and GPU acceleration */
+  will-change: transform, opacity;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: none;
+  white-space: nowrap;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.blur-shield-hover-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+  transform: translateZ(0) translate(-50%, -50%) scale(1.05);
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.8);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.blur-shield-hover-btn:active {
+  transform: translateZ(0) translate(-50%, -50%) scale(0.98);
+}
+
+/* Performance optimizations */
+.blur-shield-blurred {
+  transform: translateZ(0); /* GPU acceleration */
+  backface-visibility: hidden;
+}
