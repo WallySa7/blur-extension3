@@ -8,6 +8,7 @@
       this.whitelist = [];
       this.currentDomain = location.hostname;
       this.isWhitelisted = false;
+      this.tabForceState = undefined; // undefined = use global, false = force disable, true = force enable
       this.hoverBtn = null;
       this.currentTarget = null;
       this.styleSheet = null;
@@ -65,6 +66,7 @@
         this.isEnabled = settings.isEnabled !== false;
         this.blurIntensity = settings.blurIntensity || 10;
         this.whitelist = settings.whitelist || [];
+        this.tabForceState = settings.tabForceState;
 
         // Check whitelist status
         this.isWhitelisted = this.whitelist.some(
@@ -105,10 +107,21 @@
       });
     }
 
+    // Determine if blurring should be active based on all settings
+    shouldBlurBeActive() {
+      // Tab-specific override takes precedence
+      if (this.tabForceState !== undefined) {
+        return this.tabForceState;
+      }
+
+      // Then check global enabled state and whitelist
+      return this.isEnabled && !this.isWhitelisted;
+    }
+
     applySettings() {
       if (!this.styleSheet) return;
 
-      if (!this.isEnabled || this.isWhitelisted) {
+      if (!this.shouldBlurBeActive()) {
         // Disable all blurring
         this.styleSheet.textContent = "";
         this.addWhitelistClass();
@@ -137,7 +150,7 @@
 
       this.bodyElement = document.body;
 
-      if (!this.isEnabled || this.isWhitelisted) return;
+      if (!this.shouldBlurBeActive()) return;
 
       this.setupOptimizedObservers();
       this.setupEventDelegation();
@@ -205,8 +218,6 @@
     }
 
     processNewImages(images) {
-      const fragment = document.createDocumentFragment();
-
       images.forEach((img) => {
         if (!img.classList.contains("blur-shield-processed")) {
           img.classList.add("blur-shield-processed", "blur-shield-blurred");
@@ -253,7 +264,7 @@
     }
 
     handleMouseOver = (e) => {
-      if (!this.isEnabled || this.isWhitelisted) return;
+      if (!this.shouldBlurBeActive()) return;
 
       const target = e.target;
       if (
@@ -410,22 +421,120 @@
       }
     }
 
+    // Show visual feedback when toggling blur state
+    showToggleNotification(isBlurring) {
+      // Remove any existing notifications
+      const existing = document.querySelector(".blur-shield-notification");
+      if (existing) {
+        existing.remove();
+      }
+
+      // Create notification
+      const notification = document.createElement("div");
+      notification.className = "blur-shield-notification";
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 1000000;
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        animation: slideIn 0.3s ease-out;
+      `;
+
+      notification.innerHTML = isBlurring
+        ? "🛡️ Blur Shield Enabled"
+        : "👁️ Blur Shield Disabled";
+
+      // Add animation styles
+      const style = document.createElement("style");
+      style.textContent = `
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+
+      // Add to page
+      document.body.appendChild(notification);
+
+      // Auto-remove after 2 seconds
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.style.animation = "slideIn 0.3s ease-out reverse";
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.remove();
+            }
+          }, 300);
+        }
+        if (style.parentNode) {
+          style.remove();
+        }
+      }, 2000);
+    }
+
     setupMessageListener() {
       if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
         chrome.runtime.onMessage.addListener(
           (message, sender, sendResponse) => {
             if (message.type === "settingsChanged") {
-              this.handleSettingsChange(message.settings);
+              this.handleSettingsChange(
+                message.settings,
+                message.tabForceState
+              );
+            } else if (message.type === "toggleBlur") {
+              this.handleToggleBlur(message.forceState);
             }
           }
         );
       }
     }
 
-    handleSettingsChange(settings) {
+    handleToggleBlur(forceState) {
+      this.tabForceState = forceState;
+      this.applySettings();
+
+      // Show notification
+      const isBlurring = this.shouldBlurBeActive();
+      this.showToggleNotification(isBlurring);
+
+      // Clean up unblurred images if blurring is now active
+      if (isBlurring) {
+        document.querySelectorAll(".blur-shield-unblurred").forEach((img) => {
+          img.classList.remove("blur-shield-unblurred");
+        });
+        this.hideHoverButton();
+      }
+
+      // Reinitialize observers if needed
+      if (isBlurring && !this.intersectionObserver) {
+        this.setupOptimizedObservers();
+        this.setupEventDelegation();
+        this.createHoverButton();
+      }
+    }
+
+    handleSettingsChange(settings, tabForceState) {
       this.isEnabled = settings.isEnabled;
       this.blurIntensity = settings.blurIntensity;
       this.whitelist = settings.whitelist;
+      this.tabForceState = tabForceState;
 
       // Recalculate whitelist status
       this.isWhitelisted = this.whitelist.some(
@@ -438,7 +547,7 @@
       this.applySettings();
 
       // Clean up unblurred images if needed
-      if (!this.isEnabled || this.isWhitelisted) {
+      if (!this.shouldBlurBeActive()) {
         document.querySelectorAll(".blur-shield-unblurred").forEach((img) => {
           img.classList.remove("blur-shield-unblurred");
         });

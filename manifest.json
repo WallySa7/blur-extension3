@@ -25,5 +25,15 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Image Blur Shield"
+  },
+
+  "commands": {
+    "toggle-blur": {
+      "suggested_key": {
+        "default": "Ctrl+K",
+        "mac": "Command+K"
+      },
+      "description": "Toggle blur for current tab"
+    }
   }
 }
